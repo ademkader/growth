@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Growth tracker</title>
+<meta name="theme-color" content="#EEF3F5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F171D" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<script src="./chart.umd.js"></script>
+<style>
+@font-face{ font-family:"Atkinson Hyperlegible"; src:url("./fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2"); font-weight:400; font-display:swap; }
+@font-face{ font-family:"Atkinson Hyperlegible"; src:url("./fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2"); font-weight:700; font-display:swap; }
+@font-face{ font-family:"Bricolage Grotesque"; src:url("./fonts/bricolage-grotesque-latin-500-normal.woff2") format("woff2"); font-weight:500; font-display:swap; }
+@font-face{ font-family:"Bricolage Grotesque"; src:url("./fonts/bricolage-grotesque-latin-700-normal.woff2") format("woff2"); font-weight:700; font-display:swap; }
+:root{
+  --bg:#EEF3F5; --surface:#FFFFFF; --surface-2:#F6F9FA; --ink:#14212B; --muted:#56687A; --line:#D3DEE4;
+  --band-outer:rgba(74,140,108,.13); --band-inner:rgba(74,140,108,.22); --curve:#6E9C85; --median:#3E7A5E;
+  --accent:#1F5F8B; --accent-ink:#FFFFFF; --danger:#B42318;
+  --c0:#1F5F8B; --c1:#A23B72; --c2:#B7791F; --c3:#2F855A;
+  --radius-l:18px; --radius-s:10px;
+  --font-head:"Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body:"Atkinson Hyperlegible", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F171D; --surface:#17222A; --surface-2:#1C2932; --ink:#E7EEF2; --muted:#9AAAB6; --line:#2B3B46;
+    --band-outer:rgba(110,190,150,.10); --band-inner:rgba(110,190,150,.20); --curve:#5E8F78; --median:#86C2A5;
+    --accent:#7DB8E3; --accent-ink:#0F171D; --danger:#F97066;
+    --c0:#7DB8E3; --c1:#E38BB8; --c2:#E8B65A; --c3:#6FCF97;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F171D; --surface:#17222A; --surface-2:#1C2932; --ink:#E7EEF2; --muted:#9AAAB6; --line:#2B3B46;
+  --band-outer:rgba(110,190,150,.10); --band-inner:rgba(110,190,150,.20); --curve:#5E8F78; --median:#86C2A5;
+  --accent:#7DB8E3; --accent-ink:#0F171D; --danger:#F97066;
+  --c0:#7DB8E3; --c1:#E38BB8; --c2:#E8B65A; --c3:#6FCF97;
+  color-scheme: dark;
+}
+:root{ box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+html{ scroll-padding-top:env(safe-area-inset-top,0px); }
+*,*::before,*::after{ box-sizing:inherit; }
+[hidden]{ display:none !important; }
+.legend{ display:flex; flex-wrap:wrap; gap:6px 16px; margin:8px 2px 0; font-size:.9rem; }
+.legend span{ display:inline-flex; align-items:center; gap:6px; }
+.legend i{ width:12px; height:12px; border-radius:50%; background:var(--kc); display:inline-block; }
+body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body); font-size:16px; line-height:1.45; -webkit-text-size-adjust:100%; }
+main{ max-width:760px; margin:0 auto; padding:16px 14px 48px; }
+h1,h2,h3{ font-family:var(--font-head); font-weight:700; margin:0; letter-spacing:-.01em; }
+h1{ font-size:1.75rem; line-height:1.1; }
+h2{ font-size:1.15rem; }
+button,input,select,textarea{ font:inherit; color:inherit; }
+button{ cursor:pointer; }
+:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
+.muted{ color:var(--muted); }
+.small{ font-size:.85rem; }
+.num{ font-variant-numeric:tabular-nums; }
+
+header.top{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:6px 2px 14px; }
+header.top p{ margin:2px 0 0; }
+.icon-btn{ border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:8px 14px; font-weight:700; }
+
+.kids{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin-bottom:14px; }
+.kid{ background:var(--surface); border-radius:var(--radius-l); padding:14px 14px 12px; border-left:6px solid var(--kc); position:relative; }
+.kid h3{ font-size:1.2rem; display:flex; align-items:baseline; gap:8px; }
+.kid h3 span{ font-family:var(--font-body); font-weight:400; font-size:.9rem; color:var(--muted); }
+.kid dl{ display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:10px 0 0; }
+.kid dt{ color:var(--muted); font-size:.9rem; }
+.kid dd{ margin:0; text-align:right; }
+.kid dd b{ font-size:1.05rem; }
+.kid .when{ font-size:.8rem; color:var(--muted); margin-top:8px; }
+.kid.off{ opacity:.45; }
+.kid .vis{ position:absolute; top:10px; right:10px; border:none; background:none; color:var(--muted); font-size:.8rem; padding:4px 6px; border-radius:6px; }
+
+.panel{ background:var(--surface); border-radius:var(--radius-l); padding:14px; margin-bottom:14px; }
+.seg{ display:inline-flex; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:3px; gap:2px; }
+.seg button{ border:none; background:none; padding:7px 14px; border-radius:999px; font-weight:700; color:var(--muted); }
+.seg button[aria-pressed="true"]{ background:var(--ink); color:var(--surface); }
+.controls{ display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; margin-bottom:10px; }
+.range-row{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+.range-row .seg button{ padding:5px 11px; font-size:.9rem; }
+.custom-range{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:.9rem; color:var(--muted); width:100%; }
+.custom-range input{ width:3.6em; padding:6px 8px; text-align:center; }
+.chart-wrap{ position:relative; height:min(62vh,440px); min-height:300px; }
+.chart-note{ margin:8px 2px 0; font-size:.85rem; color:var(--muted); }
+.ref-pick{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; font-size:.9rem; }
+.ref-pick .seg button{ padding:5px 12px; font-size:.9rem; }
+
+form.add{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+label.f{ display:flex; flex-direction:column; gap:4px; font-size:.9rem; color:var(--muted); }
+label.f.full{ grid-column:1 / -1; }
+input,select,textarea{ background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-s); padding:10px 12px; font-size:16px; width:100%; min-width:0; }
+textarea{ min-height:140px; font-variant-numeric:tabular-nums; }
+.who-picker{ display:flex; gap:8px; flex-wrap:wrap; grid-column:1/-1; }
+.who-picker button{ border:2px solid var(--line); background:var(--surface-2); border-radius:999px; padding:8px 16px; font-weight:700; }
+.who-picker button[aria-pressed="true"]{ border-color:var(--kc); background:var(--kc); color:var(--surface); }
+.primary{ background:var(--accent); color:var(--accent-ink); border:none; border-radius:999px; padding:12px 18px; font-weight:700; }
+.ghost{ background:none; border:1px solid var(--line); border-radius:999px; padding:10px 16px; font-weight:700; }
+.danger{ color:var(--danger); }
+.row-actions{ grid-column:1/-1; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.msg{ font-size:.9rem; }
+.msg.err{ color:var(--danger); }
+
+details.hist{ border-top:1px solid var(--line); }
+details.hist:first-of-type{ border-top:none; }
+details.hist summary{ list-style:none; padding:12px 2px; display:flex; justify-content:space-between; align-items:center; font-weight:700; cursor:pointer; }
+details.hist summary::-webkit-details-marker{ display:none; }
+details.hist summary::after{ content:"Show"; font-weight:400; color:var(--muted); font-size:.9rem; }
+details.hist[open] summary::after{ content:"Hide"; }
+.tbl-wrap{ overflow-x:auto; }
+table{ border-collapse:collapse; width:100%; font-size:.92rem; font-variant-numeric:tabular-nums; }
+th,td{ text-align:right; padding:8px 6px; border-bottom:1px solid var(--line); white-space:nowrap; }
+th:first-child,td:first-child{ text-align:left; }
+th{ font-weight:700; color:var(--muted); font-size:.82rem; }
+td .p{ color:var(--muted); font-size:.82rem; }
+td button{ border:none; background:none; color:var(--danger); padding:4px 6px; font-size:.85rem; }
+
+dialog{ border:none; border-radius:var(--radius-l); padding:0; width:min(560px, calc(100vw - 24px)); max-height:calc(100dvh - 40px); background:var(--surface); color:var(--ink); }
+dialog::backdrop{ background:rgba(10,18,24,.5); }
+.dlg{ padding:18px; display:flex; flex-direction:column; gap:14px; }
+.dlg header{ display:flex; justify-content:space-between; align-items:center; }
+.dlg section{ display:flex; flex-direction:column; gap:10px; }
+.dlg h3{ font-size:1rem; }
+.kid-edit{ display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:12px; border:1px solid var(--line); border-radius:var(--radius-s); border-left:6px solid var(--kc); }
+.kid-edit .full{ grid-column:1/-1; }
+.empty{ text-align:center; padding:28px 12px; }
+.empty p{ max-width:36ch; margin:8px auto 16px; color:var(--muted); }
+.status{ font-size:.8rem; color:var(--muted); text-align:center; margin-top:18px; }
+@media (max-width:420px){ h1{ font-size:1.5rem; } .seg button{ padding:7px 11px; } }
+@media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div>
+      <h1>Growth</h1>
+      <p class="muted small">Height and weight against WHO growth charts</p>
+    </div>
+    <button class="icon-btn" id="openSettings" type="button">Settings</button>
+  </header>
+
+  <div id="emptyState" class="panel empty" hidden>
+    <h2>Add your children to start</h2>
+    <p>Enter each child's name, sex and date of birth. The WHO charts are sex-specific, so both are needed for percentiles.</p>
+    <button class="primary" type="button" id="emptyAdd">Add children</button>
+  </div>
+
+  <div id="app" hidden>
+    <section class="kids" id="kidCards" aria-label="Latest measurements"></section>
+
+    <section class="panel" aria-label="Chart">
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Measurement" id="metricSeg">
+          <button type="button" data-v="height" aria-pressed="true">Height</button>
+          <button type="button" data-v="weight" aria-pressed="false">Weight</button>
+          <button type="button" data-v="bmi" aria-pressed="false">BMI</button>
+        </div>
+        <div class="seg" role="group" aria-label="Chart view" id="viewSeg">
+          <button type="button" data-v="values" aria-pressed="true">Values</button>
+          <button type="button" data-v="pct" aria-pressed="false">Percentiles</button>
+        </div>
+      </div>
+      <div class="range-row">
+        <div class="seg" role="group" aria-label="Age range" id="rangeSeg">
+          <button type="button" data-v="all" aria-pressed="true">All</button>
+          <button type="button" data-v="last4" aria-pressed="false">Last 4 mo</button>
+          <button type="button" data-v="last12" aria-pressed="false">Last year</button>
+          <button type="button" data-v="custom" aria-pressed="false">Ages</button>
+        </div>
+        <div class="seg" role="group" aria-label="Child for recent range" id="rangeKidSeg" hidden></div>
+        <div class="custom-range" id="customRange" hidden>
+          <span>From</span><input type="number" inputmode="numeric" min="0" max="19" id="cFromY" aria-label="From years"><span>y</span><input type="number" inputmode="numeric" min="0" max="11" id="cFromM" aria-label="From months"><span>m</span>
+          <span>to</span><input type="number" inputmode="numeric" min="0" max="19" id="cToY" aria-label="To years"><span>y</span><input type="number" inputmode="numeric" min="0" max="11" id="cToM" aria-label="To months"><span>m</span>
+          <span class="msg err" id="customMsg" role="status"></span>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart" aria-label="Growth chart"></canvas></div>
+      <div class="legend" id="legend"></div>
+      <div class="ref-pick" id="refPick" hidden>
+        <span class="muted">WHO curves shown for</span>
+        <div class="seg" role="group" aria-label="Reference curves" id="refSeg">
+          <button type="button" data-v="1" aria-pressed="true">Boys</button>
+          <button type="button" data-v="2" aria-pressed="false">Girls</button>
+        </div>
+      </div>
+      <p class="chart-note" id="chartNote"></p>
+    </section>
+
+    <p class="panel muted small" id="roNote" hidden>You can view these measurements but not change them. Ask the person who shared this page to give you Contributor or Editor access.</p>
+
+    <section class="panel" aria-labelledby="addTitle" id="addPanel">
+      <h2 id="addTitle" style="margin-bottom:12px">Add a measurement</h2>
+      <form class="add" id="addForm" novalidate>
+        <div class="who-picker" id="whoPicker" role="group" aria-label="Child"></div>
+        <label class="f full">Date measured<input type="date" id="fDate" required></label>
+        <label class="f"><span id="hLabel">Height (cm)</span><input type="number" inputmode="decimal" step="0.1" min="0" id="fHeight" placeholder="e.g. 104.5"></label>
+        <label class="f"><span id="wLabel">Weight (kg)</span><input type="number" inputmode="decimal" step="0.01" min="0" id="fWeight" placeholder="e.g. 17.2"></label>
+        <label class="f full" id="posWrap" hidden>How was height measured?
+          <select id="fPos">
+            <option value="L">Lying down (length)</option>
+            <option value="H">Standing (height)</option>
+          </select>
+        </label>
+        <div class="row-actions">
+          <button class="primary" type="submit">Save measurement</button>
+          <span class="msg" id="addMsg" role="status"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="histTitle">
+      <h2 id="histTitle" style="margin-bottom:4px">History</h2>
+      <div id="history"></div>
+    </section>
+
+    <p class="status" id="syncStatus" role="status">Loading…</p>
+  </div>
+</main>
+
+<dialog id="settings" aria-labelledby="setTitle">
+  <div class="dlg">
+    <header><h2 id="setTitle">Settings</h2><button class="ghost" type="button" id="closeSettings">Done</button></header>
+
+    <section>
+      <h3>Children</h3>
+      <div id="kidEditList" style="display:flex;flex-direction:column;gap:10px"></div>
+      <button class="ghost needs-write" type="button" id="addKid">Add a child</button>
+    </section>
+
+    <section>
+      <h3>Units</h3>
+      <div class="seg" role="group" aria-label="Units" id="unitSeg">
+        <button type="button" data-v="metric" aria-pressed="true">cm and kg</button>
+        <button type="button" data-v="imperial" aria-pressed="false">in and lb</button>
+      </div>
+    </section>
+
+    <section class="needs-write">
+      <h3>Add historical data</h3>
+      <p class="muted small" style="margin:0">One measurement per line: date (YYYY-MM-DD), height, weight. Leave a value empty if it wasn't measured. Uses the units selected above.</p>
+      <select id="bulkKid" aria-label="Child for historical data"></select>
+      <textarea id="bulkText" placeholder="2022-03-14, 92.5, 13.6&#10;2022-09-02, 96.1,&#10;2023-01-20, , 15.2"></textarea>
+      <div class="row-actions"><button class="primary" type="button" id="bulkGo">Import lines</button><span class="msg" id="bulkMsg" role="status"></span></div>
+    </section>
+
+    <section>
+      <h3>Sync</h3>
+      <p class="small" id="syncState" style="margin:0"></p>
+      <div class="row-actions">
+        <button class="ghost" type="button" id="syncNow">Sync now</button>
+        <a class="ghost" id="sheetLink" href="#" target="_blank" rel="noopener" hidden style="text-decoration:none">Open the Google Sheet</a>
+      </div>
+      <p class="muted small" style="margin:0"><span id="connState"></span> To connect, open the setup link on this phone, or paste it here.</p>
+      <div class="row-actions">
+        <input type="url" id="setupInput" placeholder="Paste setup link" autocomplete="off" style="flex:1;min-width:12em">
+        <button class="ghost" type="button" id="connectBtn">Connect</button>
+        <button class="ghost danger" type="button" id="disconnectBtn" hidden>Disconnect</button>
+        <span class="msg" id="connMsg" role="status"></span>
+      </div>
+      <label class="f">Your name (shown in the Sheet's updated_by column)<input type="text" id="byName" autocomplete="off" placeholder="Optional"></label>
+    </section>
+
+    <section>
+      <h3>Backup</h3>
+      <p class="muted small" style="margin:0">Save a copy as a file, or restore one (for example from the Claude version). Restoring replaces all data, on every synced phone.</p>
+      <div class="row-actions">
+        <button class="ghost" type="button" id="exportBtn">Save backup file</button>
+        <label class="ghost" style="display:inline-block" for="importFile">Restore from file</label>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+        <span class="msg" id="backupMsg" role="status"></span>
+      </div>
+    </section>
+
+    <section>
+      <h3>About the reference data</h3>
+      <p class="muted small" style="margin:0">0–5 years: WHO Child Growth Standards (2006). 5–19 years: WHO Growth Reference (2007). WHO publishes weight-for-age only up to age 10; after that, use BMI-for-age (needs height and weight from the same day). Heights under 2 years are compared as lying-down length, from 2 years as standing height; a 0.7 cm correction is applied when the measuring position doesn't match. Percentiles are for tracking, not diagnosis.</p>
+    </section>
+  </div>
+</dialog>
+<script src="./who-data.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
